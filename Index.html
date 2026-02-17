@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000000">
+    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
+    <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
+    <title>Causal Graph: Living Universe</title>
+
+    <link rel="manifest" href="/manifest.json">
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        :root {
+            --universe: #00ff88;
+            --human: #ff0044;
+            --agent: #00ccff;
+            --blend: #ffaa00;
+            --causal: #aa00ff;
+            --bg: #000;
+        }
+        
+        html, body {
+            width: 100%; height: 100%;
+            background: var(--bg);
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            position: fixed;
+            touch-action: none;
+        }
+        
+        #app {
+            width: 100%; height: 100%;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+        }
+        
+        #header {
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.95);
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 10px;
+            z-index: 100;
+        }
+        
+        #mode-badge {
+            padding: 4px 12px;
+            border-radius: 15px;
+            background: rgba(0,255,136,0.2);
+            border: 1px solid var(--universe);
+            color: var(--universe);
+            font-weight: 600;
+        }
+        
+        #causal-status {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .causal-pill {
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid #444;
+            font-size: 9px;
+            transition: all 0.3s;
+        }
+        
+        .causal-pill.active {
+            box-shadow: 0 0 8px currentColor;
+        }
+        
+        .causal-pill.universe { border-color: var(--universe); color: var(--universe); }
+        .causal-pill.human { border-color: var(--human); color: var(--human); }
+        .causal-pill.agent { border-color: var(--agent); color: var(--agent); }
+        .causal-pill.blend { border-color: var(--blend); color: var(--blend); }
+        
+        #viewport {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #canvas-container {
+            width: 100%; height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .panel {
+            position: absolute;
+            background: rgba(0,0,0,0.95);
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 10px;
+            display: none;
+            z-index: 50;
+            max-height: 60%;
+            overflow-y: auto;
+        }
+        
+        .panel.visible {
+            display: block;
+        }
+        
+        #universe-panel {
+            top: 10px;
+            left: 10px;
+            width: 280px;
+            border-color: var(--universe);
+        }
+        
+        .universe-title {
+            color: var(--universe);
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        
+        .book-list {
+            margin: 8px 0;
+        }
+        
+        .book-item {
+            padding: 6px;
+            margin: 4px 0;
+            background: rgba(0,255,136,0.05);
+            border-left: 2px solid var(--universe);
+            cursor: pointer;
+        }
+        
+        .book-item:hover {
+            background: rgba(0,255,136,0.1);
+        }
+        
+        .book-item.reading {
+            border-color: var(--blend);
+            background: rgba(255,170,0,0.1);
+        }
+        
+        #human-panel {
+            top: 10px;
+            right: 10px;
+            width: 220px;
+            border-color: var(--human);
+        }
+        
+        .human-title {
+            color: var(--human);
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        
+        .hd-toggle {
+            padding: 6px 12px;
+            background: rgba(255,0,68,0.1);
+            border: 1px solid var(--human);
+            color: var(--human);
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 8px;
+        }
+        
+        .hd-toggle.active {
+            background: var(--human);
+            color: #000;
+        }
+        
+        #agent-panel {
+            bottom: 80px;
+            left: 10px;
+            width: 260px;
+            border-color: var(--agent);
+        }
+        
+        .agent-title {
+            color: var(--agent);
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        
+        .need-bar {
+            display: flex;
+            align-items: center;
+            margin: 4px 0;
+            gap: 6px;
+        }
+        
+        .need-label {
+            width: 50px;
+            color: #888;
+            font-size: 9px;
+        }
+        
+        .need-track {
+            flex: 1;
+            height: 5px;
+            background: #222;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .need-fill {
+            height: 100%;
+            background: var(--agent);
+            transition: width 0.5s;
+        }
+        
+        .goal-box {
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(0,204,255,0.1);
+            border-left: 2px solid var(--agent);
+        }
+        
+        #blend-panel {
+            bottom: 80px;
+            right: 10px;
+            width: 240px;
+            border-color: var(--blend);
+        }
+        
+        .blend-title {
+            color: var(--blend);
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        
+        .blend-log {
+            font-size: 9px;
+            color: #888;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .blend-entry {
+            margin: 3px 0;
+            padding: 3px 6px;
+            background: rgba(255,170,0,0.05);
+            border-left: 2px solid var(--blend);
+        }
+        
+        #conversation-overlay {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 500px;
+            background: rgba(0,0,0,0.95);
+            border: 1px solid var(--blend);
+            border-radius: 12px;
+            padding: 16px;
+            display: none;
+            z-index: 60;
+        }
+        
+        #conversation-overlay.visible {
+            display: block;
+        }
+        
+        .conversation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            color: var(--blend);
+        }
+        
+        .conversation-content {
+            font-size: 12px;
+            line-height: 1.6;
+            color: #ddd;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .message {
+            margin: 8px 0;
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+        
+        .message.agent {
+            background: rgba(0,204,255,0.1);
+            border-left: 3px solid var(--agent);
+            margin-right: 20%;
+        }
+        
+        .message.user {
+            background: rgba(255,0,68,0.1);
+            border-right: 3px solid var(--human);
+            margin-left: 20%;
+            text-align: right;
+        }
+        
+        .conversation-input {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
+        .conversation-input input {
+            flex: 1;
+            padding: 8px 12px;
+            background: #111;
+            border: 1px solid #444;
+            border-radius: 20px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 11px;
+        }
+        
+        .conversation-input button {
+            padding: 8px 16px;
+            background: var(--blend);
+            color: #000;
+            border: none;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        #upload-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+        
+        #upload-overlay.visible {
+            display: flex;
+        }
+        
+        .upload-zone {
+            width: 80%;
+            max-width: 400px;
+            padding: 40px;
+            border: 2px dashed #444;
+            border-radius: 16px;
+            text-align: center;
+        }
+        
+        .upload-zone:hover {
+            border-color: var(--universe);
+        }
+        
+        .upload-title {
+            font-size: 16px;
+            color: var(--universe);
+            margin-bottom: 8px;
+        }
+        
+        .upload-types {
+            font-size: 10px;
+            color: #666;
+            margin-top: 12px;
+        }
+        
+        #controls {
+            padding: 10px;
+            background: rgba(0,0,0,0.98);
+            border-top: 1px solid #333;
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .control-btn {
+            flex-shrink: 0;
+            padding: 8px 14px;
+            background: transparent;
+            border: 1px solid #444;
+            color: #888;
+            border-radius: 16px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        
+        .control-btn:hover, .control-btn.active {
+            border-color: var(--universe);
+            color: var(--universe);
+        }
+        
+        .control-btn.primary {
+            background: var(--universe);
+            color: #000;
+            border-color: var(--universe);
+        }
+        
+        .control-btn.agent-btn:hover, .control-btn.agent-btn.active {
+            border-color: var(--agent);
+            color: var(--agent);
+        }
+        
+        .control-btn.human-btn:hover, .control-btn.human-btn.active {
+            border-color: var(--human);
+            color: var(--human);
+        }
+        
+        #mode-switcher {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            z-index: 45;
+        }
+        
+        .mode-btn {
+            padding: 6px 16px;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #444;
+            color: #888;
+            border-radius: 20px;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        
+        .mode-btn.active {
+            border-color: var(--blend);
+            color: var(--blend);
+            background: rgba(255,170,0,0.1);
+        }
+        
+        #loading {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            transition: opacity 0.6s ease;
+        }
+        
+        #loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .spinner {
+            width: 50px; height: 50px;
+            border: 3px solid #111;
+            border-top-color: var(--universe);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        #file-input { display: none; }
+        
+        #top-bar, #bottom-bar {
+            background: #050505;
+            padding: 6px;
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+        }
+        
+        button {
+            background: #111;
+            color: #0f0;
+            border: 1px solid #222;
+            padding: 6px 10px;
+            font-family: inherit;
+        }
+    </style>
+</head>
+<body>
+
+<div id="loading">
+    <div class="spinner"></div>
+    <div id="loading-status" style="margin-top: 16px; font-size: 11px; color: var(--universe);">
+        Initializing Causal Graph...
+    </div>
+    <div style="margin-top: 6px; font-size: 9px; color: #444;">
+        This may take 10–40 seconds on first load
+    </div>
+</div>
+
+<div id="upload-overlay">
+    <div class="upload-zone" id="drop-zone">
+        <div class="upload-title">📤 Upload to Causal Graph</div>
+        <div style="font-size: 11px; color: #666;">
+            Drop files here or click to browse
+        </div>
+        <div class="upload-types">
+            📚 Books (.txt, .md) • 🧬 HD Data (.json) • 🏠 3D Models (.glb)<br>
+            📊 CSV • 🎭 Agent Memories (.json)
+        </div>
+        <button class="control-btn primary" style="margin-top: 16px;" onclick="document.getElementById('file-input').click()">
+            Browse Files
+        </button>
+    </div>
+</div>
+
+<div id="app" style="display: none;">
+    <div id="header">
+        <div id="mode-badge">🌌 UNIVERSE MODE</div>
+        <div id="causal-status">
+            <span class="causal-pill universe active" id="pill-universe">UNIVERSE</span>
+            <span class="causal-pill human" id="pill-human">HUMAN</span>
+            <span class="causal-pill agent" id="pill-agent">AGENT</span>
+            <span class="causal-pill blend" id="pill-blend">BLEND: 0%</span>
+        </div>
+    </div>
+    
+    <div id="mode-switcher">
+        <button class="mode-btn active" onclick="setMode('universe')" id="mode-universe">🌌 Universe</button>
+        <button class="mode-btn" onclick="setMode('home')" id="mode-home">🏠 Home</button>
+        <button class="mode-btn" onclick="setMode('theory')" id="mode-theory">📚 Theory</button>
+    </div>
+    
+    <div id="viewport">
+        <div id="canvas-container"></div>
+        
+        <div id="universe-panel" class="panel visible">
+            <div class="universe-title">📚 Book Universe</div>
+            <div style="font-size: 9px; color: #666; margin-bottom: 8px;">
+                Agent reads → Experiences → Shares
+            </div>
+            <div class="book-list" id="book-list">
+                <div style="color: #444; font-style: italic;">No books uploaded yet...</div>
+            </div>
+            <button class="control-btn primary" style="width: 100%; margin-top: 8px;" onclick="triggerUpload()">
+                + Upload Book
+            </button>
+        </div>
+        
+        <div id="human-panel" class="panel">
+            <div class="human-title">🧬 Human Design</div>
+            <button class="hd-toggle" id="hd-toggle" onclick="toggleHD()">
+                Toggle HD Layer
+            </button>
+            <div id="hd-stats" style="display: none;">
+                <div style="display: flex; justify-content: space-between; margin: 4px 0; color: #888;">
+                    <span>Type:</span><span id="hd-type" style="color: #fff;">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin: 4px 0; color: #888;">
+                    <span>Strategy:</span><span id="hd-strategy" style="color: #fff;">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin: 4px 0; color: #888;">
+                    <span>Defined:</span><span id="hd-defined" style="color: #fff;">0/9</span>
+                </div>
+            </div>
+            <button class="control-btn human-btn" style="width: 100%; margin-top: 8px;" onclick="triggerUpload()">
+                Load HD Data
+            </button>
+        </div>
+        
+        <div id="agent-panel" class="panel">
+            <div class="agent-title">🎭 Agent State</div>
+            <div class="need-bar">
+                <span class="need-label">Energy</span>
+                <div class="need-track"><div class="need-fill" id="need-energy" style="width: 70%"></div></div>
+            </div>
+            <div class="need-bar">
+                <span class="need-label">Social</span>
+                <div class="need-track"><div class="need-fill" id="need-social" style="width: 40%"></div></div>
+            </div>
+            <div class="need-bar">
+                <span class="need-label">Curiosity</span>
+                <div class="need-track"><div class="need-fill" id="need-curiosity" style="width: 80%"></div></div>
+            </div>
+            <div class="need-bar">
+                <span class="need-label">Knowledge</span>
+                <div class="need-track"><div class="need-fill" id="need-knowledge" style="width: 30%"></div></div>
+            </div>
+            <div class="goal-box" id="agent-goal">
+                <strong>Current Goal:</strong> Exploring universe for books...
+            </div>
+        </div>
+        
+        <div id="blend-panel" class="panel">
+            <div class="blend-title">🔥 Causal Blend Log</div>
+            <div class="blend-log" id="blend-log">
+                <div class="blend-entry">System initialized</div>
+            </div>
+        </div>
+        
+        <div id="conversation-overlay">
+            <div class="conversation-header">
+                <span>💬 Conversation</span>
+                <button onclick="closeConversation()" style="background: none; border: none; color: #666; cursor: pointer;">✕</button>
+            </div>
+            <div class="conversation-content" id="conversation-content">
+                <div class="message agent">
+                    Hello! I'm your causal agent. I can read books, experience their worlds, and share what I learn with you. What would you like to explore?
+                </div>
+            </div>
+            <div class="conversation-input">
+                <input type="text" id="chat-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter')sendMessage()">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="controls">
+        <button class="control-btn" onclick="togglePanel('universe')" id="btn-universe">📚 Books</button>
+        <button class="control-btn human-btn" onclick="togglePanel('human')" id="btn-human">🧬 HD</button>
+        <button class="control-btn agent-btn" onclick="togglePanel('agent')" id="btn-agent">🎭 Agent</button>
+        <button class="control-btn" onclick="togglePanel('blend')" id="btn-blend">🔥 Blend</button>
+        <button class="control-btn primary" onclick="triggerUpload()">📤 Upload</button>
+        <button class="control-btn agent-btn" onclick="callAgent()" id="btn-call">📞 Call Agent</button>
+        <button class="control-btn" onclick="randomizeAll()">🎲 Random</button>
+    </div>
+</div>
+
+<input type="file" id="file-input" accept=".txt,.md,.json,.glb,.csv" multiple>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+function log(msg, type = 'info') {
+    console.log(`[${type}]`, msg);
+}
+
+// ==================== CAUSAL GRAPH: MASTER SYSTEM ====================
+
+class CausalGraph {
+    constructor() {
+        // Three modes: universe, home, theory
+        this.mode = 'universe';
+        
+        // Systems
+        this.universe = null;
+        this.human = null;
+        this.agent = null;
+        
+        // Shared state
+        this.books = new Map();
+        this.memories = [];
+        this.causalChain = [];
+        
+        // 3D
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        
+        // Pyodide
+        this.pyodide = null;
+        
+        // UI state
+        this.panels = {
+            universe: true,
+            human: false,
+            agent: false,
+            blend: false
+        };
+        
+        this.conversation = [];
+    }
+    
+    async init() {
+        await this.initPython();
+        this.initScene();
+        this.initUniverse();
+        this.initHuman();
+        this.initAgent();
+        this.loadLocalState();
+        this.startLoops();
+        this.animate();
+        
+        log('Causal Graph initialized', 'system');
+    }
+    
+    async initPython() {
+        try {
+            document.getElementById('loading-status').textContent = "Downloading Python runtime (\~8 MB)…";
+            this.pyodide = await loadPyodide();
+            document.getElementById('loading-status').textContent = "Installing numpy…";
+            await this.pyodide.loadPackage(['numpy']);
+            document.getElementById('loading-status').textContent = "Python engine ready. Building universe…";
+            await this.pyodide.runPythonAsync(`
+import numpy as np
+import json
+
+class CausalInferenceEngine:
+    def __init__(self):
+        self.vector_clock = [0, 0, 0]
+        
+    def update_clock(self, node):
+        self.vector_clock[node] += 1
+        return self.vector_clock.copy()
+    
+    def calculate_blend(self, agent_traits, user_hd):
+        if not user_hd:
+            return agent_traits, 0.0
+        
+        hd_type = user_hd.get('type', 'Generator')
+        modulation = {
+            'Generator': {'energy': 1.3, 'curiosity': 0.9},
+            'Manifestor': {'energy': 1.2, 'curiosity': 1.1},
+            'Projector': {'energy': 0.7, 'curiosity': 1.0},
+            'Reflector': {'energy': 0.6, 'curiosity': 1.3}
+        }.get(hd_type, {})
+        
+        blended = {}
+        total_diff = 0
+        for trait, value in agent_traits.items():
+            mod = modulation.get(trait, 1.0)
+            new_val = np.clip(value * 0.6 + (value * mod) * 0.4, 0, 1)
+            blended[trait] = new_val
+            total_diff += abs(new_val - value)
+        
+        blend_pct = min(100, (total_diff / len(agent_traits)) * 200)
+        return blended, blend_pct
+    
+    def analyze_book(self, content):
+        # Simple sentiment/themes analysis
+        themes = []
+        content_lower = content.lower()
+        
+        if any(w in content_lower for w in ['love', 'heart', 'passion']):
+            themes.append('love')
+        if any(w in content_lower for w in ['war', 'battle', 'fight']):
+            themes.append('war')
+        if any(w in content_lower for w in ['magic', 'mystery', 'secret']):
+            themes.append('mystery')
+        if any(w in content_lower for w in ['future', 'space', 'tech']):
+            themes.append('scifi')
+        if any(w in content_lower for w in ['nature', 'forest', 'earth']):
+            themes.append('nature')
+            
+        return themes if themes else ['general']
+
+engine = CausalInferenceEngine()
+            `);
+            
+            log('Python engine loaded', 'system');
+        } catch (e) {
+            log('Python error: ' + e.message, 'error');
+        }
+    }
+    
+    initScene() {
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x000000);
+        this.scene.fog = new THREE.FogExp2(0x000000, 0.02);
+        
+        this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+        this.camera.position.set(0, 2, 5);
+        
+        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.shadowMap.enabled = true;
+        document.getElementById('canvas-container').appendChild(this.renderer.domElement);
+        
+        this.renderer.domElement.addEventListener("webglcontextlost", (e) => {
+            e.preventDefault();
+            console.warn("WebGL context lost");
+        }, false);
+        
+        this.renderer.domElement.addEventListener("webglcontextrestored", () => {
+            console.warn("WebGL context restored");
+            this.initScene();
+        }, false);
+        
+        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+        this.controls.minDistance = 2;
+        this.controls.maxDistance = 10;
+        
+        // Lights
+        const ambient = new THREE.AmbientLight(0x404040, 0.5);
+        this.scene.add(ambient);
+        
+        this.mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        this.mainLight.position.set(5, 5, 5);
+        this.scene.add(this.mainLight);
+    }
+    
+    initUniverse() {
+        this.universe = {
+            objects: new Map(),
+            atmosphere: 'calm',
+            books: []
+        };
+        
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(20, 20),
+            new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.name = 'universe_floor';
+        this.scene.add(floor);
+        
+        const shelf = new THREE.Group();
+        shelf.position.set(-3, 0, -3);
+        
+        for (let i = 0; i < 3; i++) {
+            const level = new THREE.Mesh(
+                new THREE.BoxGeometry(2, 0.05, 0.5),
+                new THREE.MeshStandardMaterial({ color: 0x333333 })
+            );
+            level.position.y = i * 0.6 + 0.3;
+            shelf.add(level);
+        }
+        
+        shelf.name = 'bookshelf';
+        this.scene.add(shelf);
+        this.universe.bookshelf = shelf;
+    }
+    
+    initHuman() {
+        this.human = {
+            mesh: null,
+            hd: null,
+            centers: [],
+            channels: [],
+            hdVisible: false
+        };
+        
+        const group = new THREE.Group();
+        
+        const skinMat = new THREE.MeshStandardMaterial({
+            color: 0x222222,
+            roughness: 0.7
+        });
+        
+        const parts = [
+            { geo: new THREE.SphereGeometry(0.1, 16, 16), pos: [0, 1.7, 0] }, // Head
+            { geo: new THREE.CylinderGeometry(0.12, 0.1, 0.4, 12), pos: [0, 1.35, 0] }, // Torso
+            { geo: new THREE.CylinderGeometry(0.04, 0.03, 0.5, 8), pos: [-0.15, 1.2, 0] }, // L Arm
+            { geo: new THREE.CylinderGeometry(0.04, 0.03, 0.5, 8), pos: [0.15, 1.2, 0] }, // R Arm
+            { geo: new THREE.CylinderGeometry(0.05, 0.04, 0.7, 8), pos: [-0.08, 0.7, 0] }, // L Leg
+            { geo: new THREE.CylinderGeometry(0.05, 0.04, 0.7, 8), pos: [0.08, 0.7, 0] }, // R Leg
+        ];
+        
+        parts.forEach(p => {
+            const mesh = new THREE.Mesh(p.geo, skinMat);
+            mesh.position.set(...p.pos);
+            mesh.castShadow = true;
+            group.add(mesh);
+        });
+        
+        const centerData = [
+            { name: 'Head', pos: [0, 1.85, 0], color: 0xaa88ff },
+            { name: 'Ajna', pos: [0, 1.7, 0], color: 0x88aaff },
+            { name: 'Throat', pos: [0, 1.55, 0], color: 0x88ffaa },
+            { name: 'G', pos: [0, 1.4, 0.02], color: 0xffff88 },
+            { name: 'Heart', pos: [0, 1.3, 0.03], color: 0xff0044 },
+            { name: 'Solar', pos: [0, 1.2, 0.02], color: 0xffaa44 },
+            { name: 'Spleen', pos: [-0.08, 1.3, 0], color: 0x44ff44 },
+            { name: 'Sacral', pos: [0, 1.05, 0.02], color: 0xff0044 },
+            { name: 'Root', pos: [0, 0.85, 0], color: 0xff0044 }
+        ];
+        
+        centerData.forEach(data => {
+            const geo = new THREE.SphereGeometry(0.03, 8, 8);
+            const mat = new THREE.MeshBasicMaterial({
+                color: data.color,
+                transparent: true,
+                opacity: 0
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(...data.pos);
+            mesh.userData = { centerName: data.name, defined: false };
+            mesh.visible = false;
+            group.add(mesh);
+            this.human.centers.push(mesh);
+        });
+        
+        group.position.set(1.5, 0, 0);
+        group.name = 'human';
+        this.scene.add(group);
+        this.human.mesh = group;
+    }
+    
+    initAgent() {
+        this.agent = {
+            mesh: null,
+            personality: {
+                openness: 0.7,
+                curiosity: 0.8,
+                sociability: 0.5,
+                energy: 0.6
+            },
+            needs: {
+                energy: 0.7,
+                social: 0.4,
+                curiosity: 0.8,
+                knowledge: 0.3,
+                rest: 0.2
+            },
+            currentGoal: 'explore_universe',
+            actionQueue: [],
+            memories: [],
+            booksRead: []
+        };
+        
+        const group = new THREE.Group();
+        
+        const agentMat = new THREE.MeshStandardMaterial({
+            color: 0x00ccff,
+            emissive: 0x00ccff,
+            emissiveIntensity: 0.2,
+            roughness: 0.3,
+            metalness: 0.8
+        });
+        
+        const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.35, 4, 8), agentMat);
+        body.position.y = 0.275;
+        group.add(body);
+        
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), agentMat);
+        head.position.y = 0.6;
+        group.add(head);
+        
+        const auraGeo = new THREE.SphereGeometry(0.25, 16, 16);
+        const auraMat = new THREE.MeshBasicMaterial({
+            color: 0x00ccff,
+            transparent: true,
+            opacity: 0.1,
+            wireframe: true
+        });
+        const aura = new THREE.Mesh(auraGeo, auraMat);
+        aura.position.y = 0.35;
+        group.add(aura);
+        
+        group.position.set(-1.5, 0, 0);
+        group.name = 'agent';
+        this.scene.add(group);
+        this.agent.mesh = group;
+    }
+    
+    // ==================== MODE SYSTEM ====================
+    
+    setMode(mode) {
+        this.mode = mode;
+        
+        document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`mode-${mode}`).classList.add('active');
+        
+        const modeNames = {
+            universe: '🌌 UNIVERSE MODE',
+            home: '🏠 HOME MODE',
+            theory: '📚 THEORY MODE'
+        };
+        document.getElementById('mode-badge').textContent = modeNames[mode];
+        
+        switch(mode) {
+            case 'universe':
+                this.camera.position.set(0, 2, 5);
+                this.showUniverseObjects();
+                break;
+            case 'home':
+                this.camera.position.set(0, 1.5, 3);
+                this.showHomeEnvironment();
+                break;
+            case 'theory':
+                this.camera.position.set(0, 3, 4);
+                this.showTheorySpace();
+                break;
+        }
+        
+        this.controls.target.set(0, 1, 0);
+        log(`Switched to ${mode} mode`, 'system');
+    }
+    
+    showUniverseObjects() {
+        if (this.universe.bookshelf) this.universe.bookshelf.visible = true;
+    }
+    
+    showHomeEnvironment() {
+        if (this.agent.mesh) this.agent.mesh.position.set(-1, 0, 0);
+        if (this.human.mesh) this.human.mesh.position.set(1, 0, 0);
+        
+        openConversation();
+    }
+    
+    showTheorySpace() {
+        if (this.agent.mesh) {
+            this.agent.mesh.position.set(0, 0, -2);
+            this.agent.mesh.lookAt(0, 0, 2);
+        }
+    }
+    
+    // ==================== FILE UPLOAD ====================
+    
+    async handleFile(file) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        
+        if (['txt', 'md'].includes(ext)) {
+            await this.uploadBook(file);
+        } else if (ext === 'json') {
+            await this.uploadJSON(file);
+        } else if (['glb', 'gltf'].includes(ext)) {
+            await this.upload3DModel(file);
+        }
+    }
+    
+    async uploadBook(file) {
+        const content = await file.text();
+        const id = 'book_' + Date.now();
+        
+        let themes = ['general'];
+        if (this.pyodide) {
+            try {
+                const snippet = content.substring(0,1000).replace(/`/g,"");
+                const result = await this.pyodide.runPythonAsync(`
+engine.analyze_book("""${snippet}""")
+                `);
+                themes = result;
+            } catch (e) {}
+        }
+        
+        const book = {
+            id,
+            title: file.name.replace(/\.[^/.]+$/, ""),
+            content,
+            themes,
+            read: false,
+            timestamp: Date.now()
+        };
+        
+        this.books.set(id, book);
+        this.universe.books.push(book);
+        
+        this.addBookVisual(book);
+        
+        this.updateBookList();
+        
+        log(`Book uploaded: ${book.title}`, 'universe');
+        this.addBlendLog(`Book "${book.title}" added to universe`);
+    }
+    
+    addBookVisual(book) {
+        const idx = this.universe.books.length - 1;
+        const x = (idx % 5) * 0.35 - 0.7;
+        const y = Math.floor(idx / 5) * 0.6 + 0.35;
+        
+        const colors = {
+            love: 0xff69b4,
+            war: 0x8b0000,
+            mystery: 0x4b0082,
+            scifi: 0x0088ff,
+            nature: 0x228b22,
+            general: 0x884422
+        };
+        
+        const color = colors[book.themes[0]] || 0x884422;
+        
+        const mesh = new THREE.Mesh(
+            new THREE.BoxGeometry(0.08, 0.4, 0.25),
+            new THREE.MeshStandardMaterial({ color })
+        );
+        mesh.position.set(x, y, 0);
+        mesh.userData = { type: 'book', bookId: book.id };
+        
+        this.universe.bookshelf.add(mesh);
+    }
+    
+    updateBookList() {
+        const list = document.getElementById('book-list');
+        if (this.universe.books.length === 0) {
+            list.innerHTML = '<div style="color: #444; font-style: italic;">No books uploaded yet...</div>';
+            return;
+        }
+        
+        list.innerHTML = this.universe.books.map(book => `
+            <div class="book-item \( {book.read ? 'reading' : ''}" onclick="readBook(' \){book.id}')">
+                <strong>${book.title}</strong><br>
+                <span style="font-size: 8px; color: #666;">${book.themes.join(', ')}</span>
+            </div>
+        `).join('');
+    }
+    
+    async uploadJSON(file) {
+        const content = await file.text();
+        try {
+            const data = JSON.parse(content);
+            
+            if (data.gates || data.type) {
+                this.loadHumanDesign(data);
+            } else if (data.agent_memories) {
+                this.agent.memories = data.agent_memories;
+            }
+        } catch (e) {
+            log('Error parsing JSON: ' + e.message, 'error');
+        }
+    }
+    
+    loadHumanDesign(data) {
+        this.human.hd = data;
+        
+        // Update centers
+        const centerGates = {
+            'Head': [64, 61, 63], 'Ajna': [47, 24, 4, 11, 43],
+            'Throat': [62, 23, 56, 35, 12, 45, 33, 8],
+            'G': [1, 13, 25, 46, 10], 'Heart': [51, 21, 26, 40],
+            'Solar': [10, 34, 57, 20], 'Spleen': [48, 57, 44, 50, 32, 28, 18],
+            'Sacral': [5, 14, 29, 59, 9, 3, 42, 27, 34],
+            'Root': [58, 38, 54, 19, 39, 41, 60, 52]
+        };
+        
+        let definedCount = 0;
+        this.human.centers.forEach(center => {
+            const name = center.userData.centerName;
+            const gates = centerGates[name] || [];
+            const hasGate = data.gates?.some(g => gates.includes(g));
+            center.userData.defined = hasGate;
+            if (hasGate) definedCount++;
+        });
+        
+        // Update UI
+        document.getElementById('hd-type').textContent = data.type || 'Undefined';
+        document.getElementById('hd-strategy').textContent = data.strategy || '-';
+        document.getElementById('hd-defined').textContent = `${definedCount}/9`;
+        document.getElementById('hd-stats').style.display = 'block';
+        
+        document.getElementById('pill-human').classList.add('active');
+        
+        // Recalculate blend
+        this.calculateBlend();
+        
+        log(`Human Design loaded: ${data.type}`, 'human');
+    }
+    
+    async calculateBlend() {
+        if (!this.pyodide || !this.human.hd) return;
+        
+        try {
+            const result = await this.pyodide.runPythonAsync(`
+engine.calculate_blend(${JSON.stringify(this.agent.personality)}, ${JSON.stringify(this.human.hd)})
+            `);
+            
+            const [blended, pct] = result;
+            this.agent.personality = blended;
+            
+            document.getElementById('pill-blend').textContent = `BLEND: ${Math.round(pct)}%`;
+            document.getElementById('pill-blend').classList.add('active');
+            
+            this.addBlendLog(`Personality blended: ${Math.round(pct)}%`);
+            
+        } catch (e) {}
+    }
+    
+    // ==================== AGENT BEHAVIOR ====================
+    
+    startLoops() {
+        setInterval(() => this.updateNeeds(), 2000);
+        setInterval(() => this.selectGoal(), 5000);
+        setInterval(() => this.executeAction(), 1000);
+    }
+    
+    updateNeeds() {
+        Object.keys(this.agent.needs).forEach(need => {
+            const decay = need === 'rest' ? -0.02 : 0.02;
+            this.agent.needs[need] = Math.max(0, Math.min(1, this.agent.needs[need] - decay));
+        });
+        
+        // Update UI
+        Object.keys(this.agent.needs).forEach(need => {
+            const el = document.getElementById(`need-${need}`);
+            if (el) el.style.width = (this.agent.needs[need] * 100) + '%';
+        });
+    }
+    
+    selectGoal() {
+        const goals = {
+            'explore_universe': this.agent.needs.curiosity * 0.8,
+            'read_book': this.agent.needs.knowledge * 0.9,
+            'socialize': this.agent.needs.social * 0.7,
+            'rest': this.agent.needs.rest * 0.6
+        };
+        
+        let bestGoal = null;
+        let bestScore = 0;
+        
+        Object.entries(goals).forEach(([goal, score]) => {
+            if (score > bestScore) {
+                bestScore = score;
+                bestGoal = goal;
+            }
+        });
+        
+        if (bestGoal && bestGoal !== this.agent.currentGoal) {
+            this.agent.currentGoal = bestGoal;
+            this.updateGoalUI();
+            
+            // If reading a book
+            if (bestGoal === 'read_book' && this.universe.books.length > 0) {
+                const unread = this.universe.books.find(b => !b.read);
+                if (unread) this.readBook(unread.id);
+            }
+        }
+    }
+    
+    readBook(bookId) {
+        const book = this.books.get(bookId);
+        if (!book) return;
+        
+        book.read = true;
+        this.agent.booksRead.push(book);
+        
+        this.agent.needs.knowledge = Math.min(1, this.agent.needs.knowledge + 0.3);
+        this.agent.needs.curiosity = Math.max(0, this.agent.needs.curiosity - 0.1);
+        
+        const memory = {
+            type: 'book',
+            title: book.title,
+            themes: book.themes,
+            insight: this.generateInsight(book),
+            timestamp: Date.now()
+        };
+        
+        this.agent.memories.push(memory);
+        this.memories.push(memory);
+        
+        this.updateBookList();
+        
+        this.addBlendLog(`Agent read "${book.title}"`);
+        this.addConversationMessage('agent', `I just finished reading "${book.title}". ${memory.insight}`);
+        
+        log(`Book read: ${book.title}`, 'agent');
+    }
+    
+    generateInsight(book) {
+        const insights = {
+            love: "It reminded me that connection is at the core of everything.",
+            war: "The struggle between forces mirrors our internal conflicts.",
+            mystery: "There's always more beneath the surface than we perceive.",
+            scifi: "The future is a canvas we paint with our present choices.",
+            nature: "We are part of a larger ecosystem, never separate.",
+            general: "Every story contains fragments of universal truth."
+        };
+        
+        return insights[book.themes[0]] || insights.general;
+    }
+    
+    updateGoalUI() {
+        const goalText = {
+            'explore_universe': '🔍 Exploring the universe for books...',
+            'read_book': '📚 Reading and absorbing knowledge...',
+            'socialize': '💬 Seeking conversation...',
+            'rest': '😴 Recharging energy...'
+        };
+        
+        document.getElementById('agent-goal').innerHTML = 
+            `<strong>Current Goal:</strong> ${goalText[this.agent.currentGoal] || 'Thinking...'}`;
+        
+        document.getElementById('pill-agent').classList.add('active');
+    }
+    
+    executeAction() {
+        if (!this.agent.mesh) return;
+        
+        const time = performance.now() * 0.001;
+        
+        switch(this.agent.currentGoal) {
+            case 'explore_universe':
+                this.agent.mesh.position.x = Math.sin(time * 0.5) * 2;
+                this.agent.mesh.position.z = Math.cos(time * 0.5) * 1;
+                break;
+            case 'read_book':
+                this.agent.mesh.position.set(-2, 0, -2);
+                this.agent.mesh.lookAt(0, 0, 0);
+                break;
+            case 'socialize':
+                if (this.human.mesh) {
+                    this.agent.mesh.lookAt(this.human.mesh.position);
+                }
+                break;
+        }
+    }
+    
+    // ==================== CONVERSATION ====================
+    
+    addConversationMessage(sender, text) {
+        const content = document.getElementById('conversation-content');
+        const msg = document.createElement('div');
+        msg.className = `message ${sender}`;
+        msg.textContent = text;
+        content.appendChild(msg);
+        content.scrollTop = content.scrollHeight;
+    }
+    
+    sendMessage(text) {
+        if (!text) {
+            text = document.getElementById('chat-input').value;
+            document.getElementById('chat-input').value = '';
+        }
+        
+        if (!text.trim()) return;
+        
+        this.addConversationMessage('user', text);
+        
+        // Agent response based on memories and personality
+        setTimeout(() => {
+            const response = this.generateResponse(text);
+            this.addConversationMessage('agent', response);
+        }, 1000);
+    }
+    
+    generateResponse(userText) {
+        const lower = userText.toLowerCase();
+        
+        // Check for book-related queries
+        if (lower.includes('book') || lower.includes('read')) {
+            if (this.agent.booksRead.length > 0) {
+                const recent = this.agent.booksRead[this.agent.booksRead.length - 1];
+                return `Recently, I read "${recent.title}" which explored themes of ${recent.themes.join(', ')}. Would you like to discuss it?`;
+            }
+            return "I haven't read any books yet. Please upload some for me to explore!";
+        }
+        
+        // Check for HD-related queries
+        if (lower.includes('human design') || lower.includes('hd') || lower.includes('type')) {
+            if (this.human.hd) {
+                return `I sense you're a ${this.human.hd.type}. Your strategy of ${this.human.hd.strategy} influences how I interact with you.`;
+            }
+            return "I don't have your Human Design chart yet. Upload it and I'll adapt to your energetic blueprint!";
+        }
+        
+        // General responses
+        const responses = [
+            "That's fascinating. Tell me more about your perspective.",
+            "I see. My curiosity drives me to understand these patterns.",
+            "Interesting. I've been thinking about similar concepts in my reading.",
+            "The universe is full of such mysteries, isn't it?"
+        ];
+        
+        return responses[Math.floor(Math.random() * responses.length)];
+    }
+    
+    // ==================== UTILITIES ====================
+    
+    addBlendLog(message) {
+        const log = document.getElementById('blend-log');
+        const entry = document.createElement('div');
+        entry.className = 'blend-entry';
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        log.appendChild(entry);
+        log.scrollTop = log.scrollHeight;
+    }
+    
+    toggleHD() {
+        this.human.hdVisible = !this.human.hdVisible;
+        
+        this.human.centers.forEach(center => {
+            center.visible = this.human.hdVisible;
+            if (this.human.hdVisible && center.userData.defined) {
+                center.material.opacity = 0.9;
+            }
+        });
+        
+        document.getElementById('hd-toggle').classList.toggle('active');
+    }
+    
+    // ==================== ANIMATION ====================
+    
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        
+        const time = performance.now() * 0.001;
+        
+        // Animate agent
+        if (this.agent.mesh) {
+            this.agent.mesh.scale.y = 1 + Math.sin(time * 2) * 0.02;
+            const aura = this.agent.mesh.children[this.agent.mesh.children.length - 1];
+            if (aura) {
+                aura.scale.setScalar(1 + Math.sin(time * 3) * 0.1);
+                aura.rotation.y = time * 0.5;
+            }
+        }
+        
+        // Animate human HD centers
+        if (this.human.hdVisible) {
+            this.human.centers.forEach((center, i) => {
+                if (center.userData.defined) {
+                    center.scale.setScalar(1 + Math.sin(time * 4 + i) * 0.2);
+                }
+            });
+        }
+        
+        this.controls.update();
+        this.renderer.render(this.scene, this.camera);
+    }
+    
+    saveLocalState() {
+        try {
+            localStorage.setItem("causal_state", JSON.stringify({
+                books: Array.from(this.books.values()).map(b => ({...b, content: undefined})), // skip huge content
+                memories: this.memories,
+                hd: this.human?.hd
+            }));
+        } catch (e) {}
+    }
+    
+    loadLocalState() {
+        const saved = localStorage.getItem("causal_state");
+        if (!saved) return;
+        try {
+            const data = JSON.parse(saved);
+            this.memories = data.memories || [];
+            if (data.hd) this.loadHumanDesign(data.hd);
+            // Re-add books without content if you want visuals only
+            data.books?.forEach(b => {
+                const book = {...b, content: ""}; // placeholder
+                this.books.set(book.id, book);
+                this.universe.books.push(book);
+                this.addBookVisual(book);
+            });
+            this.updateBookList();
+        } catch (e) {}
+    }
+}
+
+// ==================== GLOBAL FUNCTIONS ====================
+
+let causalGraph;
+
+async function init() {
+    await tf.setBackend('cpu');
+    await tf.ready();
+    
+    causalGraph = new CausalGraph();
+    await causalGraph.init();
+    
+    document.getElementById('loading').classList.add('hidden');
+    setTimeout(() => document.getElementById('loading').style.display = 'none', 600);
+    
+    document.getElementById('app').style.display = 'grid';
+    
+    const fileInput = document.getElementById('file-input');
+    fileInput.addEventListener('change', (e) => {
+        Array.from(e.target.files).forEach(file => {
+            causalGraph.handleFile(file);
+        });
+        document.getElementById('upload-overlay').classList.remove('visible');
+    });
+    
+    const dropZone = document.getElementById('drop-zone');
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '#00ff88';
+    });
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.style.borderColor = '#444';
+    });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '#444';
+        Array.from(e.dataTransfer.files).forEach(file => {
+            causalGraph.handleFile(file);
+        });
+    });
+    
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then(reg => log('SW registered', 'system'))
+                .catch(err => log('SW failed: ' + err.message, 'error'));
+        });
+    }
+}
+
+function setMode(mode) {
+    causalGraph.setMode(mode);
+}
+
+function togglePanel(panel) {
+    const el = document.getElementById(`${panel}-panel`);
+    el.classList.toggle('visible');
+    document.getElementById(`btn-${panel}`).classList.toggle('active');
+}
+
+function triggerUpload() {
+    document.getElementById('upload-overlay').classList.add('visible');
+}
+
+function closeConversation() {
+    document.getElementById('conversation-overlay').classList.remove('visible');
+}
+
+function readBook(bookId) {
+    causalGraph.readBook(bookId);
+}
+
+function toggleHD() {
+    causalGraph.toggleHD();
+}
+
+function callAgent() {
+    setMode('home');
+    document.getElementById('btn-call').classList.add('active');
+}
+
+function openConversation() {
+    document.getElementById('conversation-overlay').classList.add('visible');
+}
+
+function sendMessage() {
+    causalGraph.sendMessage();
+}
+
+function randomizeAll() {
+    const gates = [];
+    for (let i = 0; i < 10; i++) gates.push(Math.floor(Math.random() * 64) + 1);
+    
+    const types = ['Generator', 'Manifestor', 'Projector'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    
+    causalGraph.loadHumanDesign({
+        type,
+        strategy: type === 'Generator' ? 'Respond' : type === 'Manifestor' ? 'Inform' : 'Wait',
+        gates: [...new Set(gates)],
+        channels: []
+    });
+    
+    log('Randomized all systems', 'system');
+}
+
+// Close upload on background click
+document.getElementById('upload-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'upload-overlay') document.getElementById('upload-overlay').classList.remove('visible');
+});
+
+// Resize handler
+window.addEventListener('resize', () => {
+    if (causalGraph) {
+        causalGraph.camera.aspect = window.innerWidth / window.innerHeight;
+        causalGraph.camera.updateProjectionMatrix();
+        causalGraph.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+});
+
+// Start
+init();
+
+</script>
+
+</body>
+</html>
